@@ -1,23 +1,30 @@
-﻿using WebApplication1.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using WebApplication1.Database;
+using WebApplication1.Models;
 
 namespace WebApplication1.Storage
 {
-    public static class FlightStorage
+    public class FlightStorage(FlightPlannerDbContext context)
     {
-        private static List<Flight> _flights = new List<Flight>();
-        private static int _id = 0;
+        private readonly FlightPlannerDbContext _context = context;
+
         private static readonly object _lockObject = new object();
 
-        public static Flight GetFlightById(int id)
+        public Flight GetFlightById(int id)
         {
-            return _flights.FirstOrDefault(flight => flight.Id == id);
+            return _context.Flights
+                .Include(flight => flight.From)
+                .Include(flight => flight.To)
+                .FirstOrDefault(flight => flight.Id == id);
         }
 
-        public static Flight AddFlight(AddFlightRequest flightRequest)
+
+        public Flight AddFlight(AddFlightRequest flightRequest)
         {
             lock (_lockObject)
             {
-                if (_flights.Any(f =>
+                if (_context.Flights.Any(f =>
                 f.DepartureTime.Trim().Equals(flightRequest.DepartureTime.Trim()) &&
                 f.From.AirportCode.Trim().ToLower().Equals(flightRequest.From.AirportCode.Trim().ToLower()) &&
                 f.To.AirportCode.Trim().ToLower().Equals(flightRequest.To.AirportCode.Trim().ToLower())))
@@ -40,7 +47,6 @@ namespace WebApplication1.Storage
 
                 var flight = new Flight
                 {
-                    Id = ++_id,
                     From = flightRequest.From,
                     To = flightRequest.To,
                     Carrier = flightRequest.Carrier,
@@ -48,26 +54,27 @@ namespace WebApplication1.Storage
                     ArrivalTime = flightRequest.ArrivalTime
                 };
 
-                _flights.Add(flight);
+                _context.Flights.Add(flight);
+                _context.SaveChanges();
+
                 return flight;
             }
         }
-
-        public static void ClearFlights()
+       
+        public void ClearFlights()
         {
-            _flights.Clear();
+            _context.Flights.RemoveRange(_context.Flights);
+            _context.Airports.RemoveRange(_context.Airports);
+            _context.SaveChanges();
         }
 
-        public static PageResult<Flight> SearchFlights(SearchFlightsRequest searchRequest)
-        {
-            DateTime.TryParse(searchRequest.DepartureDate, out var searchDate);
-
-            var filteredFlights = _flights
+        public PageResult<Flight> SearchFlights(SearchFlightsRequest searchRequest)
+        {           
+            var filteredFlights = _context.Flights
                 .Where(flight =>
-                    flight.From.AirportCode.Equals(searchRequest.From, StringComparison.OrdinalIgnoreCase) &&
-                    flight.To.AirportCode.Equals(searchRequest.To, StringComparison.OrdinalIgnoreCase) &&
-                    DateTime.TryParse(flight.DepartureTime, out var departureDate) &&
-                    departureDate.Date == searchDate.Date)
+                flight.From.AirportCode.ToLower() == searchRequest.From.ToLower() &&
+                flight.To.AirportCode.ToLower() == searchRequest.To.ToLower() &&
+                flight.DepartureTime == searchRequest.DepartureDate)
                 .ToList();
 
             return new PageResult<Flight>
@@ -78,15 +85,17 @@ namespace WebApplication1.Storage
             };
         }
 
-        public static bool DeleteFlight(int id)
+        public bool DeleteFlight(int id)
         {
             lock (_lockObject)
             {
-                var flight = _flights.FirstOrDefault(f => f.Id == id);
+                var flight = _context.Flights.FirstOrDefault(f => f.Id == id);
                 if (flight == null)
                     return false;
 
-                _flights.Remove(flight);
+                _context.Remove(flight);
+                _context.SaveChanges();
+
                 return true;
             }
         }

@@ -4,22 +4,17 @@ namespace WebApplication1.Models
 {
     public class AddFlightRequest
     {
-        [Required]
         public Airport From { get; set; }
 
-        [Required]
         public Airport To { get; set; }
 
-        [Required]
         [StringLength(100, MinimumLength = 1)]
         public string Carrier { get; set; }
 
-        [Required]
         public string DepartureTime { get; set; }
 
-        [Required]
         public string ArrivalTime { get; set; }
-
+       
         public bool IsSameAirport()
         {
             return string.Equals(From.Country, To.Country, StringComparison.OrdinalIgnoreCase) &&
@@ -33,6 +28,5 @@ namespace WebApplication1.Models
             DateTime.TryParse(ArrivalTime, out DateTime arrival);
             return arrival > departure;
         }
-
     }
 }

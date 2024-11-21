@@ -1,28 +1,24 @@
-﻿using WebApplication1.Models;
+﻿using WebApplication1.Database;
+using WebApplication1.Models;
 
 namespace WebApplication1.Storage
 {
-    public static class AirportService
+    public class AirportService (FlightPlannerDbContext context)
     {
-        private static List<Airport> _airports = new List<Airport>
-        {
-        new Airport { Country = "Latvia", City = "Riga", AirportCode = "RIX" },
-        new Airport { Country = "Sweden", City = "Stockholm", AirportCode = "ARN" },
-        new Airport { Country = "United Arab Emirates", City = "Dubai", AirportCode = "DXB" },
-        new Airport { Country = "Russia", City = "Moscow", AirportCode = "DME" }
-        };
+        private readonly FlightPlannerDbContext _context = context;
 
-        public static IEnumerable<Airport> SearchAirports(string search)
+
+        public IEnumerable<Airport> SearchAirports(string search)
         {
             if (string.IsNullOrEmpty(search))
                 return new List<Airport>();
 
             search = search.Trim().ToLower();
 
-            return _airports.Where(airport =>
-                airport.AirportCode.ToLower().Contains(search) ||
-                airport.City.ToLower().Contains(search) ||
-                airport.Country.ToLower().Contains(search)
+            return _context.Airports.Where(airport =>
+                (!string.IsNullOrEmpty(airport.AirportCode) && airport.AirportCode.ToLower().Contains(search)) ||
+                (!string.IsNullOrEmpty(airport.City) && airport.City.ToLower().Contains(search)) ||
+                (!string.IsNullOrEmpty(airport.Country) && airport.Country.ToLower().Contains(search))
             ).ToList();
         }
     }

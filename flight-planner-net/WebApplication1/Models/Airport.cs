@@ -5,13 +5,14 @@ namespace WebApplication1.Models
 {
     public class Airport
     {
-        [Required]
+        [JsonIgnore]
+        public int Id { get; set; }
+
         public string Country { get; set; }
 
-        [Required]
+        [MaxLength(200)] 
         public string City { get; set; }
 
-        [Required]
         [JsonPropertyName("airport")]
         public string AirportCode { get; set; }
 

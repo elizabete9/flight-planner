@@ -6,13 +6,20 @@ namespace WebApplication1.Controllers
 {
     [Route("api")]
     [ApiController]
-    public class CustomerController : ControllerBase
+    public class CustomerController(FlightStorage storage, AirportService airport) : ControllerBase
     {
+        private readonly FlightStorage _storage = storage;
+        private readonly AirportService _airport = airport;
+
         [HttpGet]
         [Route("airports")]
         public IActionResult SearchAirports(string search)
         {
-            var results = AirportService.SearchAirports(search);
+            if (string.IsNullOrWhiteSpace(search))
+            {
+                return BadRequest("Search term cannot be empty.");
+            }
+            var results = _airport.SearchAirports(search);
             return Ok(results);
         }
 
@@ -25,7 +32,7 @@ namespace WebApplication1.Controllers
                 return BadRequest("The origin and destination airports cannot be the same.");
             }
 
-            var results = FlightStorage.SearchFlights(searchRequest);
+            var results = _storage.SearchFlights(searchRequest);
 
             if (results.TotalItems == 0)
             {
@@ -39,7 +46,7 @@ namespace WebApplication1.Controllers
         [Route("flights/{id}")]
         public IActionResult GetFlightById(int id)
         {
-            var flight = FlightStorage.GetFlightById(id);
+            var flight = _storage.GetFlightById(id);
             if (flight == null)
             {
                 return NotFound();

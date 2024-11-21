@@ -1,6 +1,9 @@
 
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.EntityFrameworkCore;
+using WebApplication1.Database;
 using WebApplication1.Handlers;
+using WebApplication1.Storage;
 
 namespace WebApplication1
 {
@@ -19,6 +22,10 @@ namespace WebApplication1
                 .AllowAnyMethod()
                 .AllowAnyHeader();
             }));
+            builder.Services.AddDbContext<FlightPlannerDbContext>(
+                options => options.UseSqlServer(builder.Configuration.GetConnectionString("flight-planner")));
+            builder.Services.AddScoped<FlightStorage>();
+            builder.Services.AddScoped<AirportService>();
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
