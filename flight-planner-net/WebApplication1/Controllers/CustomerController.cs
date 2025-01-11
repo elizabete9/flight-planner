@@ -1,15 +1,36 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AutoMapper;
+using FlightPlanner.Core.Models;
+using FlightPlanner.Core.Services;
+using FlightPlanner.Services;
+using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Identity.Client.Extensions.Msal;
 using WebApplication1.Models;
-using WebApplication1.Storage;
 
 namespace WebApplication1.Controllers
 {
     [Route("api")]
     [ApiController]
-    public class CustomerController(FlightStorage storage, AirportService airport) : ControllerBase
+    public class CustomerController(IEntityService<Flight> flightService,
+        IAirportService airportService, IMapper mapper) : ControllerBase
     {
-        private readonly FlightStorage _storage = storage;
-        private readonly AirportService _airport = airport;
+        private readonly IEntityService<Flight> _flightService = flightService;
+        private readonly IAirportService _airportService = airportService;
+        private readonly IMapper _mapper = mapper;
+
+
+        [HttpGet]
+        [Route("flights/{id}")]
+        public IActionResult GetFlightById(int id)
+        {
+            var flight = _flightService.GetById(id);
+            if (flight == null)
+            {
+                return NotFound();
+            }
+
+            return Ok(flight);
+        }
 
         [HttpGet]
         [Route("airports")]
@@ -19,40 +40,44 @@ namespace WebApplication1.Controllers
             {
                 return BadRequest("Search term cannot be empty.");
             }
-            var results = _airport.SearchAirports(search);
+            var results = _airportService.SearchAirports(search);
             return Ok(results);
         }
 
         [HttpPost]
         [Route("flights/search")]
-        public IActionResult SearchFlights(SearchFlightsRequest searchRequest)
+        public IActionResult FindFlights( SearchFlightsRequest request)
         {
-            if (string.Equals(searchRequest.From, searchRequest.To, StringComparison.OrdinalIgnoreCase))
+            if (request == null ||
+        string.IsNullOrWhiteSpace(request.From) ||
+        string.IsNullOrWhiteSpace(request.To) ||
+        string.IsNullOrWhiteSpace(request.DepartureDate))
             {
-                return BadRequest("The origin and destination airports cannot be the same.");
+                return BadRequest("Invalid search request.");
             }
 
-            var results = _storage.SearchFlights(searchRequest);
-
-            if (results.TotalItems == 0)
+            if (string.Equals(request.From, request.To, StringComparison.OrdinalIgnoreCase))
             {
-                return Ok(new PageResult<Flight> { Page = 0, TotalItems = 0, Items = new List<Flight>() });
+                return BadRequest("Origin and destination cannot be the same.");
             }
 
-            return Ok(results);
+            var departureDate = DateTime.Parse(request.DepartureDate);
+
+            var flights = _flightService.List().Where(flight =>
+                string.Equals(flight.From.AirportCode, request.From, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(flight.To.AirportCode, request.To, StringComparison.OrdinalIgnoreCase) &&
+                DateTime.Parse(flight.DepartureTime) == departureDate.Date);
+
+            var pagedResult = new PageResult<FlightResponse>
+            {
+                Page = 1,
+                TotalItems = flights.Count(),
+                Items = flights.Select(f => _mapper.Map<FlightResponse>(f)).ToList()
+            };
+
+            return Ok(pagedResult);
         }
 
-        [HttpGet]
-        [Route("flights/{id}")]
-        public IActionResult GetFlightById(int id)
-        {
-            var flight = _storage.GetFlightById(id);
-            if (flight == null)
-            {
-                return NotFound();
-            }
 
-            return Ok(flight);
-        }
     }
 }

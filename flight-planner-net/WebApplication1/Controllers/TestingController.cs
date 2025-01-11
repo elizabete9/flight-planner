@@ -1,19 +1,21 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using WebApplication1.Storage;
+﻿using FlightPlanner.Core.Models;
+using FlightPlanner.Core.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace WebApplication1.Controllers
 {
     [Route("testing-api")]
     [ApiController]
-    public class TestingController(FlightStorage storage) : ControllerBase
+    public class TestingController(IDbClearingService dbClearingService) : ControllerBase
     {
-        private readonly FlightStorage _storage = storage;
+        private readonly IDbClearingService _dbClearingService = dbClearingService;
 
         [HttpPost]
         [Route("clear")]
         public IActionResult Clear() 
         {
-            _storage.ClearFlights();
+            _dbClearingService.Clear<Airport>();
+            _dbClearingService.Clear<Flight>();
 
             return Ok();
         }

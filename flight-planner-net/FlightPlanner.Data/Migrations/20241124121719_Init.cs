@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace WebApplication1.Migrations
+namespace FlightPlanner.Data.Migrations
 {
     /// <inheritdoc />
     public partial class Init : Migration
@@ -45,15 +45,13 @@ namespace WebApplication1.Migrations
                         column: x => x.FromId,
                         principalTable: "Airports",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.NoAction,
-                        onUpdate: ReferentialAction.NoAction);
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_Flights_Airports_ToId",
                         column: x => x.ToId,
                         principalTable: "Airports",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade,
-                        onUpdate: ReferentialAction.NoAction);
+                        onDelete: ReferentialAction.NoAction);
                 });
 
             migrationBuilder.CreateIndex(

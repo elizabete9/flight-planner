@@ -1,100 +1,87 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using AutoMapper;
+using Azure.Core;
+using FlightPlanner.Core.Models;
+using FlightPlanner.Core.Services;
+using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using WebApplication1.Database;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Client.Extensions.Msal;
 using WebApplication1.Models;
-using WebApplication1.Storage;
+using WebApplication1.Validations;
+using IValidator = WebApplication1.Validations.IValidator;
 
 namespace WebApplication1.Controllers
 {
     [Route("admin-api")]
     [ApiController]
     [Authorize]
-    public class AdminController(FlightStorage storage) : ControllerBase
+    public class AdminController(IFlightService flightService, 
+        IEnumerable<IValidator> validators, 
+        IValidator<Flight> validator,
+        IMapper mapper) : ControllerBase
     {
         private static readonly object _lockObject = new object();
-        private readonly FlightStorage _storage = storage;
+        private readonly IFlightService _flightService = flightService;
+        private readonly IEnumerable<IValidator> _validators = validators;
+        private readonly IValidator<Flight> _validator = validator;
+        private readonly IMapper _mapper = mapper;
 
         [Route("flights/{id}")]
         [HttpGet]
         public IActionResult GetFlight(int id)
         {
-            var flight =_storage.GetFlightById(id);
-            if (flight == null)
+            var result = _flightService.GetFullFlightById(id);
+            if (result == null) 
             {
                 return NotFound();
             }
-            return Ok(flight);
+            var response = _mapper.Map<FlightResponse>(result);
+            return Ok(result);
         }
 
         [HttpPost]
         [Route("flights")]
-        public IActionResult AddFlight(AddFlightRequest flightRequest)
+        public IActionResult AddFlight(AddFlightRequest request)
         {
             lock (_lockObject)
             {
-                if (flightRequest == null)
+                var flight = _mapper.Map<Flight>(request);
+                var validationResult = _validator.Validate(flight);
+
+                if (!validationResult.IsValid) 
                 {
-                    return BadRequest("Flight request cannot be null.");
+                    return BadRequest();
                 }
 
-                if (flightRequest.From == null ||
-                    string.IsNullOrWhiteSpace(flightRequest.From.Country) ||
-                    string.IsNullOrWhiteSpace(flightRequest.From.City) ||
-                    string.IsNullOrWhiteSpace(flightRequest.From.AirportCode))
-                {
-                    return BadRequest("Origin airport information is invalid.");
-                }
-
-                if (flightRequest.To == null ||
-                    string.IsNullOrWhiteSpace(flightRequest.To.Country) ||
-                    string.IsNullOrWhiteSpace(flightRequest.To.City) ||
-                    string.IsNullOrWhiteSpace(flightRequest.To.AirportCode))
-                {
-                    return BadRequest("Destination airport information is invalid.");
-                }
-
-                if (string.IsNullOrWhiteSpace(flightRequest.Carrier))
-                {
-                    return BadRequest("Carrier must not be empty.");
-                }
-
-                if (!flightRequest.HasValidDates())
-                {
-                    return BadRequest("Arrival time must be after departure time.");
-                }
-
-                if (flightRequest.IsSameAirport())
-                {
-                    return BadRequest("The origin and destination airports cannot be the same.");
-                }
-
-                try
-                {
-                    var savedFlight = _storage.AddFlight(flightRequest);
-                    return Created("", savedFlight);
-                }
-                catch (InvalidOperationException)
-                {
+                var notSameFlight = _flightService.NotSameFlight(flight);
+                if (!notSameFlight) 
+                { 
                     return Conflict("Flight already exists.");
                 }
+
+                var result = _flightService.Create(flight);
+                var response = _mapper.Map<FlightResponse>(flight);
+                response.Id = result.Entity.Id;
+
+                return Created("", response);
             }
         }
-       
+
         [HttpDelete]
         [Route("flights/{id}")]
         public IActionResult DeleteFlight(int id)
         {
             lock (_lockObject)
             {
-                var flightDeleted = _storage.DeleteFlight(id); 
-                if (!flightDeleted)
-                {
+                var flight = _flightService.GetFullFlightById(id);
+                if (flight == null)
                     return Ok(new { message = "Flight not found. Nothing to delete." });
-                }
 
-                return Ok("Flight deleted successfully");
+                _flightService.Delete(flight);
+                
+               return Ok("Flight deleted successfully");
             }
         }
-            
     }
 }
